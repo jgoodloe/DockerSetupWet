@@ -503,7 +503,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - COLLECTIONS=nginx
+      # Note: If automatic collection installation fails, remove COLLECTIONS line and install manually:
+      # docker exec crowdsec cscli hub update
+      # docker exec crowdsec cscli collections install crowdsecurity/nginx
+      # Alternative: Update to latest CrowdSec version (v1.7.3) which may have better collection support
+      - COLLECTIONS=crowdsecurity/nginx
       - TZ=America/New_York
     networks:
       - crowdsec_net

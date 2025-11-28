@@ -280,6 +280,28 @@ See [SERVICE_VERIFICATION.md](SERVICE_VERIFICATION.md) for a complete verificati
 
 ## Troubleshooting
 
+### Watchtower: "unknown flag: --timeout"
+
+If you see this error, the container is using cached configuration. Restart it:
+```bash
+docker compose restart watchtower
+# Or force recreate:
+docker compose up -d --force-recreate watchtower
+```
+
+### CrowdSec: "can't find 'nginx' in collections"
+
+The nginx collection may need to be installed manually:
+```bash
+docker exec crowdsec cscli hub update
+docker exec crowdsec cscli collections install crowdsecurity/nginx
+```
+
+Or update CrowdSec to the latest version in `docker-compose.yml`:
+```yaml
+image: crowdsecurity/crowdsec:latest
+```
+
 ### Agent Not Connecting
 
 1. Verify your token in `.env` is correct
@@ -289,13 +311,15 @@ See [SERVICE_VERIFICATION.md](SERVICE_VERIFICATION.md) for a complete verificati
 ### Services Not Starting
 
 1. Check logs: `sudo docker compose logs [service-name]`
-2. Verify all directories exist in `./data/`
+2. Verify all directories exist (created by install.sh)
 3. Check disk space: `df -h`
 4. Verify Docker is running: `sudo systemctl status docker`
 
 ### Port Conflicts
 
 If ports are already in use, modify the port mappings in `docker-compose.yml`.
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more detailed troubleshooting information.
 
 ## Security Notes
 
