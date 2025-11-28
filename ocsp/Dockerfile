@@ -2,11 +2,11 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# You must copy your python script and requirements here later
-# For now, we create a placeholder to ensure the build succeeds
-RUN echo "Placeholder" > requirements.txt
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt || true
 
 COPY . .
 
+# Placeholder command until you add your script
 CMD ["python3", "-m", "http.server", "8678"]
 

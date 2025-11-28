@@ -1,0 +1,19 @@
+# Secrets
+.env
+
+# Data Directories (Volume Mounts)
+npm/data/
+npm/letsencrypt/
+portainer/data/
+uptime-kuma/data/
+filebrowser/config/
+n8n/data/
+wg-easy/data/
+crowdsec/data/
+grafana/data/
+prometheus/data/
+loki/data/
+appsec-data/
+appsec-logs/
+code-server/config/
+
