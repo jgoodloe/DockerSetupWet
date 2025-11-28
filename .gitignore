@@ -1,5 +1,28 @@
 # Secrets
 .env
 
-# Data Directories (Volume Mounts)
-data/
+# Data Directories (Volume Mounts - created by install.sh)
+npm/data/
+npm/letsencrypt/
+portainer/data/
+uptime-kuma/data/
+filebrowser/config/
+homer/assets/icons/*.png
+homer/assets/icons/*.jpg
+homer/assets/icons/*.svg
+n8n/data/
+wg-easy/data/
+fail2ban/data/
+crowdsec/data/
+grafana/data/
+prometheus/data/
+loki/data/
+appsec-config/
+appsec-data/
+appsec-logs/
+appsec-localconfig/
+code-server/config/
+falco/config/
+
+# Keep icon directory structure but ignore actual icon files
+!homer/assets/icons/README.md

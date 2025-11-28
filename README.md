@@ -4,10 +4,38 @@ Automated setup for a secure Ubuntu server featuring NGINX Proxy Manager with Op
 
 ## Services Included
 
-- **Core:** NGINX Proxy Manager + Open-AppSec WAF (SaaS) + MariaDB
-- **Management:** Portainer, Watchtower, FileBrowser, Code-Server
-- **Monitoring:** Prometheus, Grafana, Loki, cAdvisor, Node Exporter
-- **Security:** Fail2Ban, CrowdSec, WireGuard (wg-easy)
+### Core Services
+- **NGINX Proxy Manager** - Reverse proxy with Open-AppSec WAF (SaaS Managed)
+- **Open-AppSec Agent** - WAF agent connecting to SaaS cloud
+- **MariaDB** - Database for NGINX Proxy Manager
+
+### Management & Utilities
+- **Portainer** - Docker container management UI
+- **Watchtower** - Automatic container updates
+- **FileBrowser** - Web-based file manager
+- **Code-Server** - VS Code in the browser
+- **Homer** - Dashboard homepage for all services
+
+### Monitoring Stack
+- **Grafana** - Visualization and dashboards
+- **Prometheus** - Metrics collection
+- **Loki** - Log aggregation
+- **Promtail** - Log shipping
+- **cAdvisor** - Container metrics
+- **Node Exporter** - System metrics
+- **Blackbox Exporter** - Endpoint monitoring
+- **Nginx Exporter** - NPM metrics
+- **Uptime Kuma** - Uptime monitoring
+
+### Security & Network
+- **Fail2Ban** - Intrusion prevention
+- **CrowdSec** - Collaborative security
+- **WireGuard (wg-easy)** - VPN management
+- **Falco** - Runtime security monitoring
+- **OCSP Service** - Certificate status checking
+
+### Development Tools
+- **n8n** - Workflow automation
 
 ## Installation
 
@@ -44,11 +72,30 @@ The script will prompt you to edit the `.env` file. You MUST:
 
 ## Post-Install
 
-### Access NGINX Proxy Manager
+### Access Services
 
+#### Homer Dashboard (Main Entry Point)
+- **URL**: `http://<server-ip>:8080`
+- Access all services from the centralized dashboard
+
+#### NGINX Proxy Manager
 - **URL**: `http://<server-ip>:81`
 - **Default Credentials**: `admin@example.com` / `changeme`
 - **⚠️ ACTION**: Immediately change the default admin password
+
+#### Grafana (Monitoring)
+- **URL**: `http://<server-ip>:3000`
+- **Default Login**: `admin` / `admin`
+- **⚠️ ACTION**: Immediately change the default Grafana admin password
+- The Prometheus and Loki data sources should already be provisioned and ready for use
+
+#### Other Services
+- **Portainer**: `http://<server-ip>:9443`
+- **Prometheus**: `http://<server-ip>:9091`
+- **Uptime Kuma**: `http://<server-ip>:3001`
+- **n8n**: `http://<server-ip>:5678`
+- **code-server**: `http://<server-ip>:8080` (or via NPM)
+- **WireGuard**: `http://<server-ip>:51821`
 
 ### Verify Open-AppSec Connection
 
@@ -56,12 +103,15 @@ The script will prompt you to edit the `.env` file. You MUST:
 2. Check the **Agents** tab to confirm your newly deployed agent is connected and reporting status
 3. Create your first Asset (e.g., for a proxy host you define in NPM) and Install the Policy to fully secure your NGINX instance
 
-### Access Grafana (Monitoring)
+### Homer Dashboard Configuration
 
-- **URL**: `http://<server-ip>:3000`
-- **Default Login**: `admin` / `admin`
-- **⚠️ ACTION**: Immediately change the default Grafana admin password
-- The Prometheus and Loki data sources should already be provisioned and ready for use
+The Homer dashboard is pre-configured with links to all services. To update it when adding new services:
+
+1. Edit `homer/assets/config.yml`
+2. Add your service to the appropriate category
+3. Restart Homer: `docker compose restart homer`
+
+See [HOMER_DASHBOARD_NOTES.md](HOMER_DASHBOARD_NOTES.md) for detailed instructions on updating the dashboard.
 
 ## Repository Structure
 
@@ -72,17 +122,23 @@ DockerSetupWet/
 ├── .env.template              # Environment variable template
 ├── .gitignore                 # Git ignore rules
 ├── README.md                  # This file
-└── config/                    # Configuration templates
-    ├── prometheus/
-    │   └── prometheus.yml
-    ├── loki/
-    │   └── config.yml
-    ├── grafana/
-    │   └── provisioning/
-    │       ├── datasources.yml
-    │       └── dashboards.yml
-    └── appsec_agent/
-        └── local_policy.yaml
+├── HOMER_DASHBOARD_NOTES.md   # Dashboard update instructions
+├── prometheus/                # Prometheus configuration
+│   ├── prometheus.yml
+│   └── blackbox-config.yml
+├── loki/                      # Loki configuration
+│   ├── loki-config.yml
+│   └── promtail-config.yml
+├── homer/                     # Homer dashboard
+│   └── assets/
+│       ├── config.yml
+│       └── icons/            # Service icons
+├── config/                    # Additional configuration templates
+│   ├── prometheus/
+│   ├── loki/
+│   ├── grafana/
+│   └── appsec_agent/
+└── [service-data-dirs]/       # Created by install.sh
 ```
 
 ## Installation Process

@@ -11,8 +11,6 @@
 
 # --- Configuration Variables ---
 PROJECT_DIR="$(basename "$PWD")"
-CONFIG_DIR="config"
-DATA_DIR="data"
 
 # --- Utility Functions ---
 
@@ -55,41 +53,46 @@ install_docker() {
     echo "----------------------------------------------------"
 }
 
+# Function to create Docker network
+create_network() {
+    echo "--- Phase 2: Creating Docker Networks ---"
+    docker network create nginx_proxy_manager_network || true
+    echo "Docker networks ready"
+    echo "----------------------------------------------------"
+}
+
 # Function to setup directory structure and config files
 setup_directories_and_configs() {
-    echo "--- Phase 2: Setting up Directories and Configuration Files ---"
+    echo "--- Phase 3: Setting up Directories and Configuration Files ---"
 
     # Create persistent data directories
-    mkdir -p "$DATA_DIR/nginx_proxy_manager"
-    mkdir -p "$DATA_DIR/letsencrypt"
-    mkdir -p "$DATA_DIR/mariadb"
-    mkdir -p "$DATA_DIR/prometheus"
-    mkdir -p "$DATA_DIR/loki"
-    mkdir -p "$DATA_DIR/grafana/datasources"
-    mkdir -p "$DATA_DIR/grafana/provisioning/dashboards"
-    mkdir -p "$DATA_DIR/grafana/provisioning/datasources"
-    mkdir -p "$DATA_DIR/appsec_agent/config"
-    mkdir -p "$DATA_DIR/appsec_agent/data"
-    mkdir -p "$DATA_DIR/appsec_agent/logs"
-    echo "Created persistent data directories in ./$DATA_DIR/"
+    mkdir -p npm/{data,letsencrypt,custom-conf}
+    mkdir -p portainer/data
+    mkdir -p uptime-kuma/data
+    mkdir -p filebrowser/config
+    mkdir -p homer/assets/icons
+    mkdir -p n8n/data
+    mkdir -p wg-easy/data
+    mkdir -p fail2ban/data
+    mkdir -p crowdsec/{config,data}
+    mkdir -p grafana/data
+    mkdir -p prometheus/data
+    mkdir -p loki/data
+    mkdir -p appsec-config appsec-data appsec-logs appsec-localconfig
+    mkdir -p code-server/config
+    mkdir -p falco/config
+    mkdir -p ocsp
+    echo "Created persistent data directories"
 
-    # Copy config templates to the required paths
-    # Monitoring Stack Configs
-    cp "$CONFIG_DIR/prometheus/prometheus.yml" "$DATA_DIR/prometheus/"
-    cp "$CONFIG_DIR/loki/config.yml" "$DATA_DIR/loki/"
-    cp "$CONFIG_DIR/grafana/provisioning/datasources.yml" "$DATA_DIR/grafana/provisioning/datasources/"
-    cp "$CONFIG_DIR/grafana/provisioning/dashboards.yml" "$DATA_DIR/grafana/provisioning/"
-    
-    # Open-AppSec Local Policy (for reference/standalone mode, though SaaS is used)
-    cp "$CONFIG_DIR/appsec_agent/local_policy.yaml" "$DATA_DIR/appsec_agent/config/"
-
-    echo "Copied configuration files to persistent data paths in ./$DATA_DIR/"
+    # Note: Configuration files are already in place in prometheus/, loki/, and homer/assets/
+    # The docker-compose.yml references these directly
+    echo "Configuration files are ready in their respective directories"
     echo "----------------------------------------------------"
 }
 
 # Function to handle .env file creation and editing
 configure_environment() {
-    echo "--- Phase 3: Configuring Environment Variables ---"
+    echo "--- Phase 4: Configuring Environment Variables ---"
     
     # Create the .env file from the template
     if [ -f ".env.template" ]; then
@@ -119,7 +122,7 @@ configure_environment() {
 
 # Function to launch the Docker stack
 launch_stack() {
-    echo "--- Phase 4: Launching Docker Stack ---"
+    echo "--- Phase 5: Launching Docker Stack ---"
 
     # Use 'sudo' for running the compose command, especially if the user hasn't logged in/out yet
     # 'up -d' runs in detached mode
@@ -152,6 +155,7 @@ if [ ! -f "docker-compose.yml" ]; then
 fi
 
 install_docker
+create_network
 setup_directories_and_configs
 configure_environment
 launch_stack
