@@ -1,0 +1,367 @@
+version: '3.9'
+
+services:
+  # =======================================================
+  # 1. OPEN-APPSEC STACK (Replaces Standard NPM)
+  # =======================================================
+  
+  # The Agent - Connects to SaaS
+  appsec-agent:
+    image: ghcr.io/openappsec/agent:${APPSEC_VERSION}
+    container_name: appsec-agent
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - user_email=${APPSEC_USER_EMAIL}
+      - AGENT_TOKEN=${APPSEC_AGENT_TOKEN}
+      - autoPolicyLoad=${APPSEC_AUTO_POLICY_LOAD}
+      - nginxproxymanager=true
+    volumes:
+      - ${APPSEC_CONFIG}:/etc/cp/conf
+      - ${APPSEC_DATA}:/etc/cp/data
+      - ${APPSEC_LOGS}:/var/log/nano_agent
+      - ${APPSEC_LOCALCONFIG}:/ext/appsec
+    command: /cp-nano-agent
+    networks:
+      - npm_network
+      - webproxy
+
+  # The NGINX Proxy Manager - Attached to Agent
+  appsec-nginx-proxy-manager:
+    container_name: appsec-nginx-proxy-manager
+    image: ghcr.io/openappsec/nginx-proxy-manager-centrally-managed-attachment:${APPSEC_VERSION}
+    ipc: host
+    restart: unless-stopped
+    ports:
+      - '80:80'   # HTTP
+      - '443:443' # HTTPS
+      - '81:81'   # Admin UI
+    environment:
+      - TZ=America/New_York
+      - DISABLE_IPV6=true
+    volumes:
+      - ${NPM_DATA}:/data
+      - ${NPM_LETSENCRYPT}:/etc/letsencrypt
+      - ./npm/custom-conf:/etc/nginx/custom
+    networks:
+      - npm_network
+      - webproxy
+
+  # =======================================================
+  # 2. MANAGEMENT & UTILITIES
+  # =======================================================
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    ports:
+      - '9443:9443'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer/data:/data
+    networks:
+      - webproxy
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    command: --interval 21600 --cleanup
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=21600
+      - DOCKER_API_VERSION=1.44
+
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: always
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./filebrowser/config:/database
+      - /home/jgoodloe/services:/srv/services-config
+    networks:
+      - webproxy
+    command: -a 0.0.0.0 -p 80
+
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    restart: unless-stopped
+    user: "1000:1000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - DOCKER_USER=jgoodloe
+      - TZ=America/New_York
+      - DOCKER_MODS=linuxserver/mods:code-server-vscodium
+      # IMPORTANT: Verify this hash matches your desired password
+      - HASHED_PASSWORD=$$argon2i$$v=19$$m=4096,t=3,p=1$$d3N0NXFoYmdrMmx1MWloNGRtdXh2Zw$$L+YRY6evarNj3Hh1Uqh4iQ
+      - PROXY_DOMAIN=code-server.goodloe.xyz
+    volumes:
+      - ./code-server/config:/config
+      - /path/to/your/code/projects:/config/workspace
+    networks:
+      - webproxy
+
+  # =======================================================
+  # 3. APPLICATIONS & DASHBOARDS
+  # =======================================================
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: always
+    environment:
+      - TZ=America/New_York
+      - KUMA_ENABLE_PROMETHEUS=true
+    volumes:
+      - ./uptime-kuma/data:/app/data
+    networks:
+      - webproxy
+
+  homer:
+    image: b4bz/homer:latest
+    container_name: homer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./homer/assets:/www/assets
+    environment:
+      - PUID=1000
+      - PGID=1000
+    networks:
+      - webproxy
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n/data:/home/node/.n8n
+    environment:
+      - N8N_ENCRYPTION_KEY=j9YcK1rX4tY7mQ1rX4tY7cK3jV0nL5oA9uIeD8
+      - NODE_ENV=production
+      - GENERIC_TIMEZONE=America/New_York
+      - N8N_HOST=n8n.goodloe.xyz
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_HASH=true
+    networks:
+      - npm_network
+      - webproxy
+
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:15
+    container_name: wg-easy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - WEBSERVER_PORT=51821
+      - WG_HOST=108.56.239.35
+      - WG_PORT=51822
+      - PASSWORD_HASH=$$2a$$10$$IfDzL6TL4.AjQWuDAq/8deqUJKQgewjJ8tZISMCG14TnUhRRHpOD.
+      - ENABLE_PROMETHEUS_METRICS=true
+    ports:
+      - "51820:51820/udp"
+      - "51821:51821/tcp"
+    volumes:
+      - ./wg-easy/data:/etc/wireguard
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+    networks:
+      - webproxy
+
+  # =======================================================
+  # 4. MONITORING STACK (Prometheus, Grafana, Loki)
+  # =======================================================
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - webproxy
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - webproxy
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/config.yml
+      - ./loki/data:/loki/data
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/config.yml
+    networks:
+      - webproxy
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./loki/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.expand-env=true -config.file=/etc/promtail/config.yml
+    networks:
+      - webproxy
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+    ports:
+      - "9100:9100"
+    networks:
+      - webproxy
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/blackbox-config.yml:/config/blackbox.yml:ro
+    command:
+      - '--config.file=/config/blackbox.yml'
+    networks:
+      - webproxy
+
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter
+    restart: unless-stopped
+    command:
+      # Scrapes the new SaaS-managed NPM container
+      - '-nginx.scrape-uri=http://appsec-nginx-proxy-manager/stub_status'
+    networks:
+      - webproxy
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8081:8080"
+    networks:
+      - webproxy
+
+  # =======================================================
+  # 5. SECURITY & UTILITIES (Fail2Ban, CrowdSec, OCSP)
+  # =======================================================
+
+  fail2ban:
+    image: crazymax/fail2ban:latest
+    container_name: fail2ban
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    volumes:
+      # Maps to the NPM log folder defined in the .env
+      - ${NPM_DATA}/logs:/var/log/npm:ro
+      - ./fail2ban/data:/data
+    environment:
+      - TZ=America/New_York
+      - F2B_IPTABLES_CHAIN=DOCKER-USER
+    networks:
+      - webproxy
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.7.2
+    container_name: crowdsec
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${NPM_DATA}/logs:/var/log/nginx:ro
+      - ./crowdsec/config:/etc/crowdsec
+      - ./crowdsec/data:/var/lib/crowdsec/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - COLLECTIONS=nginx
+      - TZ=America/New_York
+    networks:
+      - crowdsec_net
+      - webproxy
+
+  ocsp:
+    build: ./ocsp
+    ports:
+      - "8678:8678"
+    container_name: ocsp-service
+    environment:
+      - SCHEDULE_INTERVAL=300
+      - CRL_ONLY=true
+      # Add your specific CRL URLs here
+    networks:
+      - webproxy
+
+  falco:
+    image: falcosecurity/falco:latest
+    container_name: falco
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+    networks:
+      - webproxy
+
+networks:
+  webproxy:
+    driver: bridge
+  npm_network:
+    name: nginx_proxy_manager_network
+    external: true
+  crowdsec_net:
+    driver: bridge
+
