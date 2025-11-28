@@ -158,7 +158,14 @@ After installation, verify all containers are running:
 sudo docker ps
 ```
 
-You should see `appsec-nginx-proxy-manager`, `appsec-agent`, `mariadb`, `prometheus`, `loki`, `grafana`, `cadvisor`, and `node-exporter` listed as `Up`.
+You should see all 23 services listed as `Up`:
+- **Core**: appsec-nginx-proxy-manager, appsec-agent
+- **Management**: portainer, uptime-kuma, filebrowser, homer, watchtower, code-server
+- **Development**: n8n
+- **Network/Security**: wg-easy, ocsp-service, fail2ban, crowdsec, falco, falco-driver-loader
+- **Monitoring**: grafana, prometheus, loki, promtail, cadvisor, node-exporter, blackbox-exporter, nginx-exporter
+
+See [SERVICE_VERIFICATION.md](SERVICE_VERIFICATION.md) for a complete verification checklist.
 
 ## Troubleshooting
 
