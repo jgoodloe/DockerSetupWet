@@ -1,165 +1,151 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-#
-# Script Name: install.sh
-# Description: Fully automates the installation of Docker, Docker Compose,
-#              creates required directories and configuration files, and
-#              launches the entire multi-service stack (NPM, Open-AppSec, Monitoring).
-#
-# Usage: ./install.sh
-#
+# PROJECT: DockerSetupWet - Robust installer
+# Usage: ./install.sh [--dry-run] [--skip-pull]
 
-# --- Configuration Variables ---
-PROJECT_DIR="$(basename "$PWD")"
+DRY_RUN=0
+SKIP_PULL=0
+COMPOSE_FILE=docker-compose.yml
+REQUIRED_CMDS=(docker)
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- Utility Functions ---
+function echoerr { printf "%s\n" "$*" >&2; }
 
-# Function to check if a command exists
-command_exists () {
-  command -v "$1" >/dev/null 2>&1
-}
+while [[ ${#} -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --skip-pull) SKIP_PULL=1; shift ;;
+    --help|-h) echo "Usage: $0 [--dry-run] [--skip-pull]"; exit 0 ;;
+    *) echoerr "Unknown option: $1"; exit 2;;
+  esac
+done
 
-# Function to install Docker and Docker Compose Plugin
-install_docker() {
-    echo "--- Phase 1: Installing Docker and Docker Compose ---"
-    if command_exists docker; then
-        echo "Docker is already installed. Skipping installation."
-    else
-        echo "Installing Docker..."
-        # Use the official convenience script for robust, non-interactive installation
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
-        rm get-docker.sh
-        
-        # Add the current user to the docker group to run commands without sudo
-        sudo usermod -aG docker "$USER"
-        echo "Docker installed successfully. Please log out and log back in (or run 'newgrp docker') for changes to take effect."
-        # Note: We continue, but the user may need to restart their session for full permissions.
-        # We use sudo for subsequent docker commands to ensure they run.
-    fi
-
-    # Ensure Docker Compose plugin is available
-    if command_exists docker compose; then
-        echo "Docker Compose Plugin is ready."
-    else
-        # This is usually installed by the get-docker.sh script now, but we check.
-        echo "Docker Compose V2 plugin not found. Attempting install via apt (Ubuntu/Debian)..."
-        sudo apt-get update && sudo apt-get install -y docker-compose-plugin
-        if ! command_exists docker compose; then
-            echo "Error: Docker Compose V2 plugin could not be installed. Please install it manually."
-            exit 1
-        fi
-    fi
-    echo "----------------------------------------------------"
-}
-
-# Function to create Docker network
-create_network() {
-    echo "--- Phase 2: Creating Docker Networks ---"
-    docker network create nginx_proxy_manager_network || true
-    echo "Docker networks ready"
-    echo "----------------------------------------------------"
-}
-
-# Function to setup directory structure and config files
-setup_directories_and_configs() {
-    echo "--- Phase 3: Setting up Directories and Configuration Files ---"
-
-    # Create persistent data directories
-    mkdir -p npm/{data,letsencrypt,custom-conf}
-    mkdir -p portainer/data
-    mkdir -p uptime-kuma/data
-    mkdir -p filebrowser/config
-    mkdir -p homer/assets/icons
-    mkdir -p n8n/data
-    mkdir -p wg-easy/data
-    mkdir -p fail2ban/data
-    mkdir -p crowdsec/{config,data}
-    mkdir -p grafana/data
-    mkdir -p prometheus/data
-    mkdir -p loki/data
-    mkdir -p appsec-config appsec-data appsec-logs appsec-localconfig
-    mkdir -p code-server/config
-    mkdir -p falco/config
-    mkdir -p ocsp
-    echo "Created persistent data directories"
-
-    # Note: Configuration files are already in place in prometheus/, loki/, and homer/assets/
-    # The docker-compose.yml references these directly
-    echo "Configuration files are ready in their respective directories"
-    echo "----------------------------------------------------"
-}
-
-# Function to handle .env file creation and editing
-configure_environment() {
-    echo "--- Phase 4: Configuring Environment Variables ---"
-    
-    # Create the .env file from the template
-    if [ -f ".env.template" ]; then
-        cp ".env.template" ".env"
-        echo "Created .env file from .env.template."
-    else
-        echo "Error: .env.template not found. Cannot proceed."
-        exit 1
-    fi
-
-    echo ""
-    echo "#####################################################################"
-    echo "### CRITICAL STEP: OPEN-APPSEC TOKEN CONFIGURATION                  ###"
-    echo "#####################################################################"
-    echo "Please edit the generated '.env' file now. You MUST replace:"
-    echo "1. 'REPLACE_WITH_YOUR_TOKEN' with your Open-AppSec SaaS Profile Token."
-    echo "2. 'user@example.com' with your actual email address (optional, but recommended)."
-    echo ""
-    echo "Opening .env for editing..."
-    
-    # Use nano for editing the file
-    nano .env
-
-    echo "Finished editing .env. Continuing with deployment..."
-    echo "----------------------------------------------------"
-}
-
-# Function to launch the Docker stack
-launch_stack() {
-    echo "--- Phase 5: Launching Docker Stack ---"
-
-    # Use 'sudo' for running the compose command, especially if the user hasn't logged in/out yet
-    # 'up -d' runs in detached mode
-    sudo docker compose up -d
-
-    if [ $? -eq 0 ]; then
-        echo "----------------------------------------------------"
-        echo "✅ Deployment Complete!"
-        echo "All services are running in the background."
-        echo "----------------------------------------------------"
-        echo "Next steps:"
-        echo "1. Verify container status: sudo docker ps"
-        echo "2. Access NGINX Proxy Manager: http://<Your Server IP>:81"
-        echo "3. Access Grafana: http://<Your Server IP>:3000 (Default user: admin, Pass: admin)"
-    else
-        echo "----------------------------------------------------"
-        echo "❌ ERROR: Docker Compose failed to start the services."
-        echo "Please check the logs: sudo docker compose logs"
-        echo "----------------------------------------------------"
-        exit 1
-    fi
-}
-
-# --- Main Execution ---
-
-# Ensure the script is run from the root of the cloned repository
-if [ ! -f "docker-compose.yml" ]; then
-    echo "Error: 'docker-compose.yml' not found. Please run this script from the root directory of the DockerSetupWet repository."
-    exit 1
+# Check if Docker is installed
+if ! command -v docker >/dev/null 2>&1; then
+  echo "[*] Docker not found. Installing Docker..."
+  if [[ $DRY_RUN -eq 0 ]]; then
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    rm get-docker.sh
+    sudo usermod -aG docker "$USER"
+    echo "[!] Docker installed. You may need to log out and back in for group permissions."
+  else
+    echo "DRY RUN: would install Docker"
+  fi
 fi
 
-install_docker
-create_network
-setup_directories_and_configs
-configure_environment
-launch_stack
+# Check if docker compose is available
+if ! docker compose version >/dev/null 2>&1; then
+  if ! docker-compose version >/dev/null 2>&1; then
+    echo "[*] Docker Compose not found. Installing..."
+    if [[ $DRY_RUN -eq 0 ]]; then
+      sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+    else
+      echo "DRY RUN: would install docker-compose-plugin"
+    fi
+  fi
+fi
 
-# Suggest logging out for non-sudo docker commands to work
-echo ""
-echo "NOTE: If you want to run 'docker' or 'docker compose' commands without 'sudo', you must log out and log back in to activate the docker group membership."
+# Determine compose command
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker compose"
+elif docker-compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker-compose"
+else
+  echoerr "Docker Compose not available. Please install it."
+  exit 3
+fi
+
+# Validate compose file
+if [[ ! -f "$BASE_DIR/$COMPOSE_FILE" ]]; then
+  echoerr "Compose file not found at $BASE_DIR/$COMPOSE_FILE"
+  exit 4
+fi
+
+# Create Docker network
+echo "[*] Creating Docker network..."
+if [[ $DRY_RUN -eq 0 ]]; then
+  docker network create nginx_proxy_manager_network || true
+else
+  echo "DRY RUN: would create network nginx_proxy_manager_network"
+fi
+
+# Create required directories and set safe permissions
+echo "[*] Ensuring expected directories exist..."
+REQUIRED_DIRS=(
+  npm/data npm/letsencrypt npm/custom-conf
+  appsec-config appsec-data appsec-logs appsec-localconfig
+  portainer/data
+  uptime-kuma/data
+  filebrowser/config
+  homer/assets/icons
+  n8n/data
+  wg-easy/data
+  ocsp
+  grafana/data
+  prometheus/data
+  loki/data
+  fail2ban/data
+  crowdsec/config crowdsec/data
+  code-server/config
+  falco/config
+)
+
+for d in "${REQUIRED_DIRS[@]}"; do
+  dst="$BASE_DIR/$d"
+  if [[ ! -d "$dst" ]]; then
+    echo "  - Creating $dst"
+    if [[ $DRY_RUN -eq 0 ]]; then
+      mkdir -p "$dst"
+    fi
+  fi
+done
+
+# Create .env from template if missing
+if [[ ! -f "$BASE_DIR/.env" ]]; then
+  if [[ -f "$BASE_DIR/.env.template" ]]; then
+    echo "[*] Creating .env from .env.template"
+    if [[ $DRY_RUN -eq 0 ]]; then
+      cp "$BASE_DIR/.env.template" "$BASE_DIR/.env"
+      echo "[!] IMPORTANT: Edit .env and add your Open-AppSec token and other secrets"
+      echo "[!] Press Enter to open .env in nano, or Ctrl+C to exit and edit manually..."
+      read -r
+      nano "$BASE_DIR/.env"
+    else
+      echo "DRY RUN: would copy .env.template to .env"
+    fi
+  else
+    echoerr ".env.template not found. Cannot proceed."
+    exit 5
+  fi
+fi
+
+# Optional docker pull (unless skip)
+if [[ $SKIP_PULL -eq 0 ]]; then
+  echo "[*] Pulling images (this may take a while)..."
+  if [[ $DRY_RUN -eq 0 ]]; then
+    $COMPOSE_CMD -f "$COMPOSE_FILE" pull || echo "[!] Some images failed to pull (continue)"
+  else
+    echo "DRY RUN: would pull images"
+  fi
+fi
+
+# Start stack
+echo "[*] Starting stack with docker compose up -d"
+if [[ $DRY_RUN -eq 0 ]]; then
+  $COMPOSE_CMD -f "$COMPOSE_FILE" up -d --build --remove-orphans
+  echo "[*] Waiting for key services to become healthy..."
+  sleep 6
+  # quick health check summary
+  docker ps --format 'table {{.Names}}\t{{.Status}}'
+  echo ""
+  echo "[*] Install complete!"
+  echo "[*] Access NGINX Proxy Manager at: http://$(hostname -I | awk '{print $1}'):81"
+  echo "[*] Access Grafana at: http://$(hostname -I | awk '{print $1}'):3000"
+  echo "[*] Access Homer Dashboard at: http://$(hostname -I | awk '{print $1}'):8080"
+  echo ""
+  echo "[*] If needed, review .env, then run: $COMPOSE_CMD logs -f to inspect issues."
+else
+  echo "DRY RUN: would run $COMPOSE_CMD up -d --build"
+fi

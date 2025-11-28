@@ -1,5 +1,9 @@
 # Secrets
 .env
+*.key
+*.pem
+*.crt
+*.cert
 
 # Data Directories (Volume Mounts - created by install.sh)
 npm/data/
@@ -26,3 +30,20 @@ falco/config/
 
 # Keep icon directory structure but ignore actual icon files
 !homer/assets/icons/README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Temporary files
+*.tmp
+*.log
+*.bak

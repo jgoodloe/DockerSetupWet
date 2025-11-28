@@ -26,6 +26,12 @@ services:
     networks:
       - npm_network
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "[ -f /etc/cp/conf/ready ] || pgrep -f cp-nano-agent || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # The NGINX Proxy Manager with open-appsec attachment
   appsec-nginx-proxy-manager:
@@ -49,6 +55,12 @@ services:
     networks:
       - npm_network
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:81/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # =======================================================
   # 2. YOUR CUSTOM SERVICES (Preserved)
@@ -65,6 +77,12 @@ services:
       - ./portainer/data:/data
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://127.0.0.1:9443/api/status || exit 1"]
+      interval: 45s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   uptime-kuma:
     image: louislam/uptime-kuma:latest
@@ -97,6 +115,12 @@ services:
     networks:
       - webproxy
     command: -a 0.0.0.0 -p 80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   homer:
     image: b4bz/homer:latest
@@ -111,6 +135,12 @@ services:
       - PGID=1000
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   n8n:
     image: n8nio/n8n:latest
@@ -139,6 +169,12 @@ services:
     networks:
       - npm_network
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:5678/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy:15
@@ -162,6 +198,12 @@ services:
     restart: unless-stopped
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:51821/ || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Custom Build Required: ./ocsp/Dockerfile must exist
   ocsp:
@@ -179,6 +221,12 @@ services:
       - CRL_NOTIFICATIONS={"http://crl.xca.xpki.com/CRLs/XTec_PIVI_CA1.crl":{"http_push_url":"http://uptime-kuma:3001/api/push/ynOyE22dMh?status=up&msg=OK"},"http://crl.xcatest2.xpki.com/CRLs/XTec_PIVI_Test2_CA_1.crl":{"http_push_url":"http://uptime-kuma:3001/api/push/9TwqAsFUR0?status=up&msg=OK"}}
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:8678/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -190,6 +238,11 @@ services:
     environment:
       - WATCHTOWER_POLL_INTERVAL=21600
       - DOCKER_API_VERSION=1.44
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "ps aux | grep watchtower | grep -v grep || exit 1"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
 
   code-server:
     image: lscr.io/linuxserver/code-server:latest
@@ -212,6 +265,12 @@ services:
       - ./homer/assets/:/config/homer
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # -------------------------
   # MONITORING STACK
@@ -229,6 +288,12 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   prometheus:
     image: prom/prometheus:latest
@@ -250,6 +315,12 @@ services:
       - "9091:9090"
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9090/-/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -265,6 +336,12 @@ services:
       - "8081:8080"
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   loki:
     image: grafana/loki:latest
@@ -279,6 +356,12 @@ services:
     command: -config.file=/etc/loki/config.yml
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   promtail:
     image: grafana/promtail:latest
@@ -294,6 +377,11 @@ services:
     command: -config.expand-env=true -config.file=/etc/promtail/config.yml
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "ps aux | grep promtail | grep -v grep || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -315,6 +403,12 @@ services:
       - "9100:9100"
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
@@ -327,6 +421,12 @@ services:
       - '--config.file=/config/blackbox.yml'
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:9115/metrics || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
@@ -337,6 +437,12 @@ services:
       - '-nginx.scrape-uri=http://appsec-nginx-proxy-manager/stub_status'
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -f http://127.0.0.1:9113/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   fail2ban:
     image: crazymax/fail2ban:latest
@@ -354,6 +460,12 @@ services:
       - F2B_IPTABLES_CHAIN=DOCKER-USER
     networks:
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "fail2ban-client ping || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.2
@@ -377,6 +489,12 @@ services:
     networks:
       - crowdsec_net
       - webproxy
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "cscli metrics || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   falco-driver-loader:
     image: falcosecurity/falco-driver-loader:latest
@@ -390,6 +508,12 @@ services:
       - FALCO_DRIVER_NAME=falco
       - FALCO_TARGET=generic
       - FALCO_DRIVER_TYPE=modern_ebpf
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "test -f /opt/falco-driver/falco.ko || exit 1"]
+      interval: 2m
+      timeout: 10s
+      retries: 2
+      start_period: 1m
 
   falco:
     image: falcosecurity/falco:latest
@@ -418,6 +542,12 @@ services:
     networks:
       - webproxy
     pid: host
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "ps aux | grep falco | grep -v grep || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
 
 networks:
   webproxy:
