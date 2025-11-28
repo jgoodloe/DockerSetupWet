@@ -184,14 +184,23 @@ services:
     cap_add:
       - NET_ADMIN
     environment:
-      - WEBSERVER_PORT=51821
-      - WG_HOST=108.56.239.35
+      # wg-easy v15 migration: Environment variable names changed
+      # See: https://wg-easy.github.io/wg-easy/latest/advanced/migrate/from-14-to-15/
+      - TZ=America/New_York
+      # Web server port (admin UI) - changed from WEBSERVER_PORT
+      - PORT=51821
+      # WireGuard server host (public IP or domain)
+      - WG_HOST=${WG_HOST:-108.56.239.35}
+      # WireGuard server port
       - WG_PORT=51822
-      - PASSWORD_HASH=$$2a$$10$$IfDzL6TL4.AjQWuDAq/8deqUJKQgewjJ8tZISMCG14TnUhRRHpOD.
-      - ENABLE_PROMETHEUS_METRICS=true
+      # Password for admin UI - changed from PASSWORD_HASH (can be plain text or hash)
+      # If using hash, keep the $$ prefix for docker-compose variable escaping
+      - PASSWORD=$$2a$$10$$IfDzL6TL4.AjQWuDAq/8deqUJKQgewjJ8tZISMCG14TnUhRRHpOD.
+      # Enable Prometheus metrics - changed from ENABLE_PROMETHEUS_METRICS
+      - METRICS=true
     ports:
-      - "51820:51820/udp"
-      - "51821:51821/tcp"
+      - "51820:51820/udp"  # WireGuard port
+      - "51821:51821/tcp"  # Web UI port
     volumes:
       - ./wg-easy/data:/etc/wireguard
     sysctls:
