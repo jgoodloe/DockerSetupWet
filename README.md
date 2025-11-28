@@ -4,9 +4,9 @@ Automated setup for a secure Ubuntu server featuring NGINX Proxy Manager with Op
 
 ## Services Included
 
-- **Core:** NGINX Proxy Manager + Open-AppSec WAF (SaaS)
+- **Core:** NGINX Proxy Manager + Open-AppSec WAF (SaaS) + MariaDB
 - **Management:** Portainer, Watchtower, FileBrowser, Code-Server
-- **Monitoring:** Prometheus, Grafana, Loki, Uptime Kuma
+- **Monitoring:** Prometheus, Grafana, Loki, cAdvisor, Node Exporter
 - **Security:** Fail2Ban, CrowdSec, WireGuard (wg-easy)
 
 ## Installation
@@ -36,51 +36,108 @@ chmod +x install.sh
 
 ### 3. Configuration
 
-The script will prompt you to edit the `.env` file. You MUST paste your Open-AppSec Agent Token into the `APPSEC_AGENT_TOKEN` field.
+The script will prompt you to edit the `.env` file. You MUST:
+
+1. Replace `REPLACE_WITH_YOUR_TOKEN` with your Open-AppSec SaaS Profile Token
+2. Replace `user@example.com` with your actual email address (optional, but recommended)
+3. Change the default database passwords (`DB_ROOT_PASSWORD` and `DB_MYSQL_PASSWORD`) to secure, unique passwords
 
 ## Post-Install
 
-Access your NGINX Admin UI at: `http://<server-ip>:81`
+### Access NGINX Proxy Manager
 
-**Default Credentials:** `admin@example.com` / `changeme`
+- **URL**: `http://<server-ip>:81`
+- **Default Credentials**: `admin@example.com` / `changeme`
+- **⚠️ ACTION**: Immediately change the default admin password
+
+### Verify Open-AppSec Connection
+
+1. Log back into the [Open-AppSec Portal](https://my.openappsec.io)
+2. Check the **Agents** tab to confirm your newly deployed agent is connected and reporting status
+3. Create your first Asset (e.g., for a proxy host you define in NPM) and Install the Policy to fully secure your NGINX instance
+
+### Access Grafana (Monitoring)
+
+- **URL**: `http://<server-ip>:3000`
+- **Default Login**: `admin` / `admin`
+- **⚠️ ACTION**: Immediately change the default Grafana admin password
+- The Prometheus and Loki data sources should already be provisioned and ready for use
+
+## Repository Structure
+
+```
+DockerSetupWet/
+├── install.sh                  # Automated setup script
+├── docker-compose.yml          # Master service definition
+├── .env.template              # Environment variable template
+├── .gitignore                 # Git ignore rules
+├── README.md                  # This file
+└── config/                    # Configuration templates
+    ├── prometheus/
+    │   └── prometheus.yml
+    ├── loki/
+    │   └── config.yml
+    ├── grafana/
+    │   └── provisioning/
+    │       ├── datasources.yml
+    │       └── dashboards.yml
+    └── appsec_agent/
+        └── local_policy.yaml
+```
+
+## Installation Process
+
+The `install.sh` script automates the following:
+
+1. **Phase 1**: Installs Docker and Docker Compose (if not present)
+2. **Phase 2**: Creates data directories and copies configuration files
+3. **Phase 3**: Prompts you to configure the `.env` file with your Open-AppSec token
+4. **Phase 4**: Launches all services using Docker Compose
+
+## Verification
+
+After installation, verify all containers are running:
+
+```bash
+sudo docker ps
+```
+
+You should see `appsec-nginx-proxy-manager`, `appsec-agent`, `mariadb`, `prometheus`, `loki`, `grafana`, `cadvisor`, and `node-exporter` listed as `Up`.
+
+## Troubleshooting
+
+### Agent Not Connecting
+
+1. Verify your token in `.env` is correct
+2. Check agent logs: `sudo docker logs appsec-agent`
+3. Ensure the token was copied correctly from the Open-AppSec Portal
+
+### Services Not Starting
+
+1. Check logs: `sudo docker compose logs [service-name]`
+2. Verify all directories exist in `./data/`
+3. Check disk space: `df -h`
+4. Verify Docker is running: `sudo systemctl status docker`
+
+### Port Conflicts
+
+If ports are already in use, modify the port mappings in `docker-compose.yml`.
+
+## Security Notes
+
+1. **Change Default Passwords**: Update all default credentials immediately after first login
+2. **Firewall**: Configure your firewall to only expose necessary ports
+3. **SSL/TLS**: Use Let's Encrypt certificates through NPM for all services
+4. **Token Security**: Never commit your `.env` file with tokens to version control
+5. **Regular Updates**: Review and update containers regularly
+
+## Additional Resources
+
+- [Open-AppSec Documentation](https://docs.openappsec.io)
+- [NGINX Proxy Manager Documentation](https://nginxproxymanager.com)
+- [Docker Documentation](https://docs.docker.com)
+- [Grafana Documentation](https://grafana.com/docs/)
 
 ---
 
-## 🚀 How to Create the GitHub Project (For You)
-
-Execute these commands on your local machine (where you created the files above) to push them to your repository.
-
-```bash
-# 1. Initialize Git in your project folder
-cd path/to/your/DockerSetupWet/files
-git init
-
-# 2. Add the remote repository
-git remote add origin https://github.com/jgoodloe/DockerSetupWet.git
-
-# 3. Stage all files
-git add .
-
-# 4. Commit
-git commit -m "Initial commit of full docker stack"
-
-# 5. Push to GitHub (You may be asked for username/Personal Access Token)
-git branch -M main
-git push -u origin main
-```
-
-## 🖥️ How to Install on the New Machine
-
-Once the code is on GitHub, log into your new Ubuntu machine and run:
-
-```bash
-# 1. Download and set up
-git clone https://github.com/jgoodloe/DockerSetupWet.git
-cd DockerSetupWet
-chmod +x install.sh
-
-# 2. Run the magic script
-./install.sh
-```
-
-The script will handle the heavy lifting (installing Docker, creating folders), pause to let you paste your token, and then launch everything.
+**Note**: This setup is designed for production use with proper security configurations. Always review and customize settings according to your specific requirements.

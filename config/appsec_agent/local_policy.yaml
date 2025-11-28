@@ -1,0 +1,37 @@
+#
+# This is a minimal Open-AppSec policy file.
+# NOTE: In SaaS-Managed mode, this file is generally OVERRIDDEN by the
+# configuration fetched from the WebUI using the APPSEC_AGENT_TOKEN.
+#
+apiVersion: "v1beta1"
+kind: "LocalPolicy"
+metadata:
+  name: "initial-docker-policy"
+  version: "1.0.0"
+
+spec:
+  assets:
+    # Asset definition is usually empty in SaaS mode, as assets are defined in the WebUI.
+    # The agent will synchronize the WebUI configuration.
+    
+    # If the WebUI fails to connect, the agent uses a minimal default protection:
+    - name: "Default-Asset-Protection"
+      mode: "detect"
+      protection:
+        api_endpoints:
+          - path: "/*"
+            protocol: "http-and-https"
+            security:
+              active_protections:
+                - "bot_protection"
+                - "machine_learning"
+                - "web_attacks"
+              
+  log_management:
+    # Log configuration for open-appsec agent. Logs are accessible via the mounted volume.
+    log_config:
+      default_log_level: "Info"
+      log_destination: "syslog"
+      syslog_server_address: "127.0.0.1:514"
+      max_log_size: 10000000 # 10MB
+

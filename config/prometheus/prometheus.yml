@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s # Scrape targets every 15 seconds.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds.
+
+scrape_configs:
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Scrape Node Exporter (Host Metrics)
+  - job_name: 'node_exporter'
+    # Use the container name as the hostname, on the monitoring network
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Scrape cAdvisor (Container Metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # Scrape Grafana and Loki metrics (Internal Monitoring)
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+

@@ -1,0 +1,14 @@
+apiVersion: 1
+
+providers:
+  # Enable logging integration for all containers
+  - name: 'Docker Logs (Loki)'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      # Placeholder for a custom JSON dashboard that pulls all container logs
+      path: /var/lib/grafana/dashboards
+

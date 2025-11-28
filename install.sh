@@ -1,58 +1,161 @@
 #!/bin/bash
 
-# Define colors
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+#
+# Script Name: install.sh
+# Description: Fully automates the installation of Docker, Docker Compose,
+#              creates required directories and configuration files, and
+#              launches the entire multi-service stack (NPM, Open-AppSec, Monitoring).
+#
+# Usage: ./install.sh
+#
 
-echo -e "${GREEN}Starting Setup for DockerSetupWet...${NC}"
+# --- Configuration Variables ---
+PROJECT_DIR="$(basename "$PWD")"
+CONFIG_DIR="config"
+DATA_DIR="data"
 
-# 1. Update System & Install Docker (if not present)
-if ! command -v docker &> /dev/null; then
-    echo "Docker not found. Installing..."
-    sudo apt update
-    sudo apt install -y docker.io docker-compose-plugin git
-    sudo usermod -aG docker $USER
-    echo -e "${GREEN}Docker installed. NOTE: You may need to re-login for group permissions to apply.${NC}"
-else
-    echo "Docker is already installed."
-fi
+# --- Utility Functions ---
 
-# 2. Create External Network
-echo "Creating Docker Network..."
-docker network create nginx_proxy_manager_network || true
+# Function to check if a command exists
+command_exists () {
+  command -v "$1" >/dev/null 2>&1
+}
 
-# 3. Create Data Directory Structure (These are not in Git)
-echo "Creating data directories..."
-mkdir -p npm/{data,letsencrypt,custom-conf}
-mkdir -p portainer/data
-mkdir -p uptime-kuma/data
-mkdir -p filebrowser/config
-mkdir -p homer/assets
-mkdir -p n8n/data
-mkdir -p wg-easy/data
-mkdir -p fail2ban/data
-mkdir -p crowdsec/{config,data}
-mkdir -p grafana/data
-mkdir -p prometheus/data
-mkdir -p loki/data
-mkdir -p appsec-config appsec-data appsec-logs appsec-localconfig
-mkdir -p code-server/config
+# Function to install Docker and Docker Compose Plugin
+install_docker() {
+    echo "--- Phase 1: Installing Docker and Docker Compose ---"
+    if command_exists docker; then
+        echo "Docker is already installed. Skipping installation."
+    else
+        echo "Installing Docker..."
+        # Use the official convenience script for robust, non-interactive installation
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        rm get-docker.sh
+        
+        # Add the current user to the docker group to run commands without sudo
+        sudo usermod -aG docker "$USER"
+        echo "Docker installed successfully. Please log out and log back in (or run 'newgrp docker') for changes to take effect."
+        # Note: We continue, but the user may need to restart their session for full permissions.
+        # We use sudo for subsequent docker commands to ensure they run.
+    fi
 
-# 4. Environment Configuration
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env.example .env
-    echo -e "${GREEN}!!! ACTION REQUIRED !!!${NC}"
-    echo "Please edit the .env file and add your Open-AppSec Agent Token."
-    read -p "Press Enter to open .env in nano, or Ctrl+C to exit and edit manually..."
+    # Ensure Docker Compose plugin is available
+    if command_exists docker compose; then
+        echo "Docker Compose Plugin is ready."
+    else
+        # This is usually installed by the get-docker.sh script now, but we check.
+        echo "Docker Compose V2 plugin not found. Attempting install via apt (Ubuntu/Debian)..."
+        sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+        if ! command_exists docker compose; then
+            echo "Error: Docker Compose V2 plugin could not be installed. Please install it manually."
+            exit 1
+        fi
+    fi
+    echo "----------------------------------------------------"
+}
+
+# Function to setup directory structure and config files
+setup_directories_and_configs() {
+    echo "--- Phase 2: Setting up Directories and Configuration Files ---"
+
+    # Create persistent data directories
+    mkdir -p "$DATA_DIR/nginx_proxy_manager"
+    mkdir -p "$DATA_DIR/letsencrypt"
+    mkdir -p "$DATA_DIR/mariadb"
+    mkdir -p "$DATA_DIR/prometheus"
+    mkdir -p "$DATA_DIR/loki"
+    mkdir -p "$DATA_DIR/grafana/datasources"
+    mkdir -p "$DATA_DIR/grafana/provisioning/dashboards"
+    mkdir -p "$DATA_DIR/grafana/provisioning/datasources"
+    mkdir -p "$DATA_DIR/appsec_agent/config"
+    mkdir -p "$DATA_DIR/appsec_agent/data"
+    mkdir -p "$DATA_DIR/appsec_agent/logs"
+    echo "Created persistent data directories in ./$DATA_DIR/"
+
+    # Copy config templates to the required paths
+    # Monitoring Stack Configs
+    cp "$CONFIG_DIR/prometheus/prometheus.yml" "$DATA_DIR/prometheus/"
+    cp "$CONFIG_DIR/loki/config.yml" "$DATA_DIR/loki/"
+    cp "$CONFIG_DIR/grafana/provisioning/datasources.yml" "$DATA_DIR/grafana/provisioning/datasources/"
+    cp "$CONFIG_DIR/grafana/provisioning/dashboards.yml" "$DATA_DIR/grafana/provisioning/"
+    
+    # Open-AppSec Local Policy (for reference/standalone mode, though SaaS is used)
+    cp "$CONFIG_DIR/appsec_agent/local_policy.yaml" "$DATA_DIR/appsec_agent/config/"
+
+    echo "Copied configuration files to persistent data paths in ./$DATA_DIR/"
+    echo "----------------------------------------------------"
+}
+
+# Function to handle .env file creation and editing
+configure_environment() {
+    echo "--- Phase 3: Configuring Environment Variables ---"
+    
+    # Create the .env file from the template
+    if [ -f ".env.template" ]; then
+        cp ".env.template" ".env"
+        echo "Created .env file from .env.template."
+    else
+        echo "Error: .env.template not found. Cannot proceed."
+        exit 1
+    fi
+
+    echo ""
+    echo "#####################################################################"
+    echo "### CRITICAL STEP: OPEN-APPSEC TOKEN CONFIGURATION                  ###"
+    echo "#####################################################################"
+    echo "Please edit the generated '.env' file now. You MUST replace:"
+    echo "1. 'REPLACE_WITH_YOUR_TOKEN' with your Open-AppSec SaaS Profile Token."
+    echo "2. 'user@example.com' with your actual email address (optional, but recommended)."
+    echo ""
+    echo "Opening .env for editing..."
+    
+    # Use nano for editing the file
     nano .env
+
+    echo "Finished editing .env. Continuing with deployment..."
+    echo "----------------------------------------------------"
+}
+
+# Function to launch the Docker stack
+launch_stack() {
+    echo "--- Phase 4: Launching Docker Stack ---"
+
+    # Use 'sudo' for running the compose command, especially if the user hasn't logged in/out yet
+    # 'up -d' runs in detached mode
+    sudo docker compose up -d
+
+    if [ $? -eq 0 ]; then
+        echo "----------------------------------------------------"
+        echo "✅ Deployment Complete!"
+        echo "All services are running in the background."
+        echo "----------------------------------------------------"
+        echo "Next steps:"
+        echo "1. Verify container status: sudo docker ps"
+        echo "2. Access NGINX Proxy Manager: http://<Your Server IP>:81"
+        echo "3. Access Grafana: http://<Your Server IP>:3000 (Default user: admin, Pass: admin)"
+    else
+        echo "----------------------------------------------------"
+        echo "❌ ERROR: Docker Compose failed to start the services."
+        echo "Please check the logs: sudo docker compose logs"
+        echo "----------------------------------------------------"
+        exit 1
+    fi
+}
+
+# --- Main Execution ---
+
+# Ensure the script is run from the root of the cloned repository
+if [ ! -f "docker-compose.yml" ]; then
+    echo "Error: 'docker-compose.yml' not found. Please run this script from the root directory of the DockerSetupWet repository."
+    exit 1
 fi
 
-# 5. Launch Services
-echo "Building and Starting Containers..."
-# Ensure the script is running with user permissions that can access docker
-docker compose up -d --build
+install_docker
+setup_directories_and_configs
+configure_environment
+launch_stack
 
-echo -e "${GREEN}Deployment Complete!${NC}"
-echo "Access NGINX Proxy Manager at: http://$(hostname -I | awk '{print $1}'):81"
-
+# Suggest logging out for non-sudo docker commands to work
+echo ""
+echo "NOTE: If you want to run 'docker' or 'docker compose' commands without 'sudo', you must log out and log back in to activate the docker group membership."
