@@ -11,6 +11,8 @@ services:
     container_name: appsec-agent
     ipc: host # CRITICAL: Must be 'host' for shared memory with NPM
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     environment:
       - https_proxy=${APPSEC_HTTPS_PROXY}
       - user_email=${APPSEC_USER_EMAIL}
@@ -40,6 +42,8 @@ services:
     image: ghcr.io/openappsec/nginx-proxy-manager-centrally-managed-attachment:${APPSEC_VERSION}
     ipc: host # CRITICAL: Must match the agent
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     ports:
       - '80:80'   # HTTP
       - '443:443' # HTTPS
@@ -231,13 +235,24 @@ services:
   watchtower:
     image: containrrr/watchtower:latest
     container_name: watchtower
-    command: --interval 21600 --cleanup
+    command: 
+      - --interval=21600
+      - --cleanup
+      - --rollback
+      - --monitor-only=false
+      - --include-restarting
+      - --timeout=30s
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_POLL_INTERVAL=21600
       - DOCKER_API_VERSION=1.44
+      # Uncomment and configure one of the following notification methods:
+      # - WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL=https://hooks.slack.com/services/xxx
+      # - WATCHTOWER_NOTIFICATION_DISCORD_HOOK_URL=https://discord.com/api/webhooks/xxxx
+      # - WATCHTOWER_NOTIFICATION_EMAIL_FROM=updates@yourdomain
+      # - WATCHTOWER_NOTIFICATION_EMAIL_TO=you@yourdomain
     healthcheck:
       test: ["CMD", "bash", "-lc", "ps aux | grep watchtower | grep -v grep || exit 1"]
       interval: 5m
@@ -302,6 +317,8 @@ services:
       - PGID=65534
     container_name: prometheus
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -347,6 +364,8 @@ services:
     image: grafana/loki:latest
     container_name: loki
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     volumes:
       # Requires ./loki/loki-config.yml to exist
       - ./loki/loki-config.yml:/etc/loki/config.yml
@@ -471,6 +490,8 @@ services:
     image: crowdsecurity/crowdsec:v1.7.2
     container_name: crowdsec
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -519,6 +540,8 @@ services:
     image: falcosecurity/falco:latest
     container_name: falco
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     cap_add:
       - SYS_PTRACE
       - NET_ADMIN

@@ -2,6 +2,117 @@
 
 Automated setup for a secure Ubuntu server featuring NGINX Proxy Manager with Open-AppSec (SaaS Managed), Monitoring Stack, and utilities.
 
+## Architecture Overview
+
+### High-Level System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Internet
+    end
+
+    Internet --> NPM[appsec-nginx-proxy-manager<br/>Reverse Proxy + WAF]
+
+    NPM -->|WAF Control Channel| APPSEC[appsec-agent]
+
+    subgraph Core_Apps[Core Applications]
+        FB[filebrowser]
+        HK[Homer Dashboard]
+        N8N[n8n Automation]
+        CS[code-server IDE]
+        UK[uptime-kuma]
+        PT[Portainer]
+    end
+
+    NPM --> FB
+    NPM --> HK
+    NPM --> N8N
+    NPM --> CS
+    NPM --> UK
+    NPM --> PT
+
+    subgraph Monitoring[Monitoring Stack]
+        PRM[Prometheus]
+        GRF[Grafana]
+        LOKI[Loki Logs]
+        PROMTAIL[promtail]
+        CAD[cAdvisor]
+        NEXP[node-exporter]
+        BBX[blackbox-exporter]
+        NGINXEXP[nginx-exporter]
+    end
+
+    PROMTAIL --> LOKI
+    CAD --> PRM
+    NEXP --> PRM
+    BBX --> PRM
+    NGINXEXP --> PRM
+    PRM --> GRF
+
+    subgraph Security[Security Stack]
+        F2B[Fail2Ban]
+        CRW[CrowdSec]
+        FALCO[Falco Runtime IDS]
+        FDR[falco-driver-loader]
+    end
+
+    NPM -->|Logs| F2B
+    NPM -->|Logs| CRW
+    FDR --> FALCO
+
+    subgraph Network[Network Services]
+        WG[wg-easy VPN]
+        OCSP[Custom OCSP/CRL Checker]
+    end
+    
+    WG --> NPM
+    OCSP --> UK
+```
+
+### Docker Networking Diagram
+
+```mermaid
+flowchart LR
+    subgraph webproxy[webproxy network]
+        NPM(appsec-nginx-proxy-manager)
+        COREAPPS[All public-facing apps]
+        MONITORING[Monitoring Stack]
+        SECURITY[Fail2Ban / CrowdSec Interfaces]
+    end
+
+    subgraph npm_network[npm_network external network]
+        NPM2(appsec-nginx-proxy-manager)
+        APPSEC(appsec-agent WAF Manager)
+        N8N[n8n]
+    end
+
+    NPM2 --- APPSEC
+    NPM --- COREAPPS
+    NPM --- N8N
+    COREAPPS --- MONITORING
+
+    subgraph crowdsec_net[crowdsec_net network]
+        CRW[CrowdSec]
+    end
+```
+
+### Monitoring Flow (Prometheus + Loki + Grafana)
+
+```mermaid
+flowchart TD
+    CAD[cAdvisor] --> PROM[Prometheus]
+    NODE[node-exporter] --> PROM
+    BLACKBOX[blackbox-exporter] --> PROM
+    NGINXEXP[nginx-exporter] --> PROM
+    F2B[Fail2Ban metrics] -.-> PROM
+    CRW[CrowdSec metrics] -.-> PROM
+
+    PROM --> GRAF[Grafana]
+
+    APPLOGS[Container Logs] --> PROMTAIL[promtail] --> LOKI[Loki]
+    LOKI --> GRAF
+```
+
 ## Services Included
 
 ### Core Services
