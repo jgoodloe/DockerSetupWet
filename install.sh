@@ -102,6 +102,22 @@ for d in "${REQUIRED_DIRS[@]}"; do
   fi
 done
 
+# Fix Prometheus data directory permissions (runs as nobody:65534)
+if [[ $DRY_RUN -eq 0 ]] && [[ -d "$BASE_DIR/prometheus/data" ]]; then
+  echo "[*] Setting Prometheus data directory permissions..."
+  sudo chown -R 65534:65534 "$BASE_DIR/prometheus/data" 2>/dev/null || echo "  Note: Could not set Prometheus permissions (may need manual fix)"
+fi
+
+for d in "${REQUIRED_DIRS[@]}"; do
+  dst="$BASE_DIR/$d"
+  if [[ ! -d "$dst" ]]; then
+    echo "  - Creating $dst"
+    if [[ $DRY_RUN -eq 0 ]]; then
+      mkdir -p "$dst"
+    fi
+  fi
+done
+
 # Create .env from template if missing
 if [[ ! -f "$BASE_DIR/.env" ]]; then
   if [[ -f "$BASE_DIR/.env.template" ]]; then

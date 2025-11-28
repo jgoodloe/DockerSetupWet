@@ -282,12 +282,33 @@ See [SERVICE_VERIFICATION.md](SERVICE_VERIFICATION.md) for a complete verificati
 
 ### Watchtower: "unknown flag: --timeout"
 
-If you see this error, the container is using cached configuration. Restart it:
+If you see this error, the container is using cached configuration. **You MUST force recreate it:**
 ```bash
-docker compose restart watchtower
-# Or force recreate:
+# Stop and remove the container
+docker compose stop watchtower
+docker compose rm -f watchtower
+
+# Recreate with new config
+docker compose up -d watchtower
+
+# Or use force recreate (one command):
 docker compose up -d --force-recreate watchtower
 ```
+
+**Note:** The configuration file is correct (`--stop-timeout=30s`), but Docker is using the old cached command. Force recreation is required.
+
+### Prometheus: "permission denied" on queries.active
+
+Prometheus runs as user `nobody` (UID 65534) but the data directory may be owned by root. Fix it:
+```bash
+# Fix permissions
+sudo chown -R 65534:65534 ./prometheus/data
+
+# Restart Prometheus
+docker compose up -d --force-recreate prometheus
+```
+
+The `install.sh` script now automatically sets these permissions, but if you created the directory manually, you'll need to fix it.
 
 ### CrowdSec: "can't find 'nginx' in collections"
 

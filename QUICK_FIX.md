@@ -2,6 +2,8 @@
 
 ## Watchtower: "unknown flag: --timeout"
 
+**IMPORTANT:** The configuration file is correct, but the container is using cached/old configuration. You MUST force recreate it.
+
 **Problem:** Container is using old cached configuration.
 
 **Solution:**
@@ -58,21 +60,56 @@ docker compose up -d --force-recreate crowdsec
 
 The warning about `version: '3.9'` being obsolete is harmless. It's been removed from the file, so this warning should disappear after restarting services.
 
+## Prometheus: "permission denied" on queries.active
+
+**Problem:** Prometheus runs as user `nobody` (UID 65534) but the data directory is owned by root.
+
+**Solution:**
+```bash
+# Fix permissions on the Prometheus data directory
+sudo chown -R 65534:65534 ./prometheus/data
+
+# Or if you prefer, make it writable by all (less secure)
+sudo chmod -R 777 ./prometheus/data
+
+# Then restart Prometheus
+docker compose up -d --force-recreate prometheus
+```
+
+**Alternative:** The configuration now includes a user directive, but you still need to fix existing directory permissions.
+
 ## After Fixes
 
-1. Restart affected services:
+1. **Fix Watchtower (CRITICAL - must force recreate):**
    ```bash
-   docker compose restart watchtower crowdsec
+   docker compose stop watchtower
+   docker compose rm -f watchtower
+   docker compose up -d watchtower
+   # Or use force recreate:
+   docker compose up -d --force-recreate watchtower
    ```
 
-2. Verify they're running:
+2. **Fix Prometheus permissions:**
+   ```bash
+   sudo chown -R 65534:65534 ./prometheus/data
+   docker compose up -d --force-recreate prometheus
+   ```
+
+3. **Fix CrowdSec (if needed):**
+   ```bash
+   docker exec crowdsec cscli hub update
+   docker exec crowdsec cscli collections install crowdsecurity/nginx
+   ```
+
+4. Verify they're running:
    ```bash
    docker compose ps
    ```
 
-3. Check logs for errors:
+5. Check logs for errors:
    ```bash
    docker compose logs watchtower
+   docker compose logs prometheus
    docker compose logs crowdsec
    ```
 

@@ -310,11 +310,9 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    environment:
-      - PUID=65534
-      - PGID=65534
     container_name: prometheus
     restart: unless-stopped
+    user: "65534:65534"  # Run as nobody user to match Prometheus default
     labels:
       - "com.centurylinklabs.watchtower.enable=false" # Critical service - manual updates only
     command:
@@ -322,6 +320,10 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--query.max-concurrency=20'
+      - '--query.max-samples=50000000'
+      # Disable query logging to avoid permission issues (optional - can be re-enabled after fixing permissions)
+      - '--query.active-query-tracker-path=/prometheus/queries.active'
     volumes:
       # Requires ./prometheus/prometheus.yml to exist
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
