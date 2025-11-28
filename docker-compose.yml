@@ -233,13 +233,8 @@ services:
   watchtower:
     image: containrrr/watchtower:latest
     container_name: watchtower
-    command: 
-      - --interval=21600
-      - --cleanup
-      - --rolling-restart
-      - --include-restarting
-      - --stop-timeout=30s
-      - --enable-lifecycle-hooks
+    # Using string format to ensure proper parsing
+    command: --interval=21600 --cleanup --rolling-restart --include-restarting --stop-timeout=30s --enable-lifecycle-hooks
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
