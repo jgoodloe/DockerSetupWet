@@ -167,13 +167,24 @@ WATCHTOWER_NOTIFICATION_EMAIL_TO=you@yourdomain
 2. Smoke test via Uptime-Kuma
 3. Only after passing → production receives update (manual or supervised)
 
-### 4. Enable Rollback Protection
+### 4. Safe Update Strategy
 
-Use `--rollback` to revert automatically if a new image crashes.
+Since Watchtower doesn't support automatic rollback, use these strategies:
+
+- **`--rolling-restart`**: Restart containers one at a time to minimize downtime
+- **`--enable-lifecycle-hooks`**: Execute pre/post-update commands for validation
+- **Healthchecks**: All services have healthchecks - Watchtower will respect container health status
+- **Manual rollback**: Keep previous images available for quick manual rollback if needed
 
 **Recommended Watchtower command:**
 ```yaml
-command: --interval 21600 --cleanup --rollback
+command: 
+  - --interval=21600
+  - --cleanup
+  - --rolling-restart
+  - --include-restarting
+  - --stop-timeout=30s
+  - --enable-lifecycle-hooks
 ```
 
 ### 5. Use Digest-Pinned Images for Critical Services
@@ -197,12 +208,18 @@ This ensures:
 
 Watchtower restart logic:
 1. Pull new image
-2. Stop old container
+2. Stop old container (one at a time with `--rolling-restart`)
 3. Start new container
-4. Wait for healthcheck
-5. If healthcheck fails → rollback
+4. Wait for healthcheck (Docker will mark unhealthy if healthcheck fails)
+5. If healthcheck fails → container marked unhealthy, but manual intervention needed
 
-Because your stack includes healthchecks, Watchtower becomes safe.
+**Note:** Watchtower doesn't have automatic rollback. However:
+- Healthchecks ensure containers are marked unhealthy if they fail
+- `--rolling-restart` minimizes impact by updating one container at a time
+- Lifecycle hooks can execute validation scripts
+- Previous images are kept until `--cleanup` runs, allowing manual rollback
+
+Because your stack includes healthchecks, Watchtower will respect container health status.
 
 ### 7. Backup Before Upgrade
 
@@ -224,12 +241,18 @@ rsync -a ./ /backups/docker/$(date +%Y%m%d)
 ## Best Watchtower Setup
 
 The recommended Watchtower configuration is included in `docker-compose.yml` with:
-- `--rollback` for automatic rollback on failure
-- `--cleanup` to remove old images
-- Appropriate timeout settings
-- Healthcheck integration
+- `--rolling-restart` for safer one-at-a-time updates
+- `--cleanup` to remove old images (after verification)
+- `--enable-lifecycle-hooks` for pre/post-update validation
+- `--stop-timeout=30s` for graceful shutdowns
+- Healthcheck integration (containers with failing healthchecks will be marked unhealthy)
 
-**Note:** Critical services should have `com.centurylinklabs.watchtower.enable=false` label to prevent automatic updates.
+**Note:** Critical services have `com.centurylinklabs.watchtower.enable=false` label to prevent automatic updates. These should be updated manually after testing.
+
+**Manual Rollback:** If an update fails, you can manually rollback by:
+1. Stop the updated container
+2. Change the image tag in docker-compose.yml to the previous version
+3. Run `docker compose up -d` to restore the previous version
 
 ---
 
